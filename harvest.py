@@ -2,80 +2,72 @@ import os
 import requests
 import time
 
-# --- CONFIGURATION ---
-MAX_BACKGROUNDS = 85
+# CONFIG
+MAX_BACKGROUNDS = 100 
 MAX_MOTIFS = 1500
-BASE_URL = "https://static.ankama.com/dofus/renderer/emblem"
+# We use the proxy to handle the "202 Processing" delays for us
+PROXY_BASE = "https://wsrv.nl/?url=static.ankama.com/dofus/renderer/emblem"
 
 # Create folders
 os.makedirs("backgrounds", exist_ok=True)
 os.makedirs("motifs", exist_ok=True)
 
-# Headers to look like a real browser
-HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-    'Referer': 'https://www.dofus.com/'
-}
-
-def download_with_retry(url, path):
-    if os.path.exists(path):
+def download_via_proxy(ankama_path, save_path):
+    # Skip if we already have it
+    if os.path.exists(save_path):
+        # Optional: Print less to keep logs clean
+        # print(f"[SKIP] {save_path}") 
         return 
     
+    # Retry loop for the proxy
     attempts = 0
-    while attempts < 5:
+    while attempts < 3:
         try:
-            r = requests.get(url, headers=HEADERS, timeout=10)
+            # &output=png ensures we get a standard image format
+            # &n=-1 tells the proxy to fetch immediately
+            full_url = f"{PROXY_BASE}{ankama_path}&output=png&n=-1"
             
-            # SUCCESS
+            r = requests.get(full_url, timeout=30)
+            
             if r.status_code == 200:
-                with open(path, 'wb') as f:
+                with open(save_path, 'wb') as f:
                     f.write(r.content)
-                print(f"[OK] {path}")
+                print(f"[OK] {save_path}")
                 return
             
-            # RENDERING (WAIT AND RETRY)
-            elif r.status_code == 202:
-                print(f"[WAIT] {path} is generating... (202)")
-                time.sleep(1.5) # Wait for server to render
-                attempts += 1
-                continue # Retry loop
-            
-            # BLOCKED (WAIT LONGER)
-            elif r.status_code == 403 or r.status_code == 429:
-                print(f"[BLOCKED] Rate limit. Sleeping 10s...")
-                time.sleep(10)
-                attempts += 1
-                continue
-
-            # NOT FOUND
             elif r.status_code == 404:
-                # Normal for gaps
-                return
+                # 404 from Proxy usually means 404 from Origin (Gap in IDs)
+                return 
             
+            elif r.status_code == 429:
+                # Rate limit on the proxy side
+                time.sleep(2)
+                attempts += 1
             else:
-                print(f"[ERR] {r.status_code}: {url}")
-                return
-
+                # Other error
+                attempts += 1
+                
         except Exception as e:
-            print(f"[EXC] {e}")
-            time.sleep(1)
+            print(f"[ERR] {e}")
             attempts += 1
-            
-    print(f"[FAIL] Could not download {path} after retries.")
+    
+    # If we get here, it failed 3 times
+    print(f"[FAIL] Could not download {save_path}")
 
-print("--- STARTING SMART HARVEST ---")
+print("--- Starting Proxy Harvest ---")
 
 # 1. Backgrounds
+print(">>> Downloading Backgrounds...")
 for i in range(1, MAX_BACKGROUNDS + 1):
-    url = f"{BASE_URL}/1/{i}/0xCCCCCC/0x000000/60_60-0.png"
-    download_with_retry(url, f"backgrounds/{i}.png")
-    time.sleep(0.1)
+    # Path: /1/ID/0xCCCCCC/0x000000/60_60-0.png
+    path = f"/1/{i}/0xCCCCCC/0x000000/60_60-0.png"
+    download_via_proxy(path, f"backgrounds/{i}.png")
 
 # 2. Motifs
+print(">>> Downloading Motifs...")
 for i in range(1, MAX_MOTIFS + 1):
-    url = f"{BASE_URL}/{i}/1/0xFFFFFF/0x333333/60_60-0.png"
-    download_with_retry(url, f"motifs/{i}.png")
-    time.sleep(0.1)
+    # Path: /ID/1/0xFFFFFF/0x333333/60_60-0.png
+    path = f"/{i}/1/0xFFFFFF/0x333333/60_60-0.png"
+    download_via_proxy(path, f"motifs/{i}.png")
 
-print("--- DONE ---")
+print("--- Job Complete ---")
