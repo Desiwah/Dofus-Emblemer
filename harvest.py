@@ -3,69 +3,66 @@ import requests
 import time
 
 # --- CONFIGURATION ---
-# We scan past the known limit to catch new updates automatically
 MAX_BACKGROUNDS = 100 
 MAX_MOTIFS = 2000
 
-# Proxy to bypass firewall
+# Proxy
 PROXY_BASE = "https://corsproxy.io/?"
 ANKAMA_BASE = "https://static.ankama.com/dofus/renderer/emblem"
+ASSET_DIR = "assets"
 
 # Create folders
-os.makedirs("backgrounds", exist_ok=True)
-os.makedirs("motifs", exist_ok=True)
+os.makedirs(f"{ASSET_DIR}/backgrounds", exist_ok=True)
+os.makedirs(f"{ASSET_DIR}/motifs", exist_ok=True)
 
 def download_file(ankama_path, save_path):
-    # Optimization: Don't re-download if we already have it
     if os.path.exists(save_path):
-        # print(f"[EXISTS] {save_path}", flush=True) 
         return 
     
+    # URL
     target_url = PROXY_BASE + ANKAMA_BASE + ankama_path
     
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        
-        # 10s timeout is enough. If it takes longer, it probably doesn't exist.
-        r = requests.get(target_url, headers=headers, timeout=10)
-        
-        if r.status_code == 200:
-            with open(save_path, 'wb') as f:
-                f.write(r.content)
-            print(f"[NEW] Downloaded: {save_path}", flush=True)
-            
-        elif r.status_code == 404:
-            # THIS IS KEY: 404 means "Not released yet". This is NOT a crash.
-            # We just ignore it silently or print a small msg
-            pass 
-            
-        else:
-            print(f"[ERR] Status {r.status_code} for {save_path}", flush=True)
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'
+    }
 
-    except Exception as e:
-        # If proxy times out, it usually means the file doesn't exist or proxy is busy.
-        # We catch the error so the script DOES NOT CRASH.
-        print(f"[WARN] skipped {save_path} (Timeout/Error)", flush=True)
+    # FAST RETRY LOOP
+    # We only try 2 times max.
+    for attempt in range(2):
+        try:
+            # TIMEOUT IS NOW 2 SECONDS
+            # If it takes longer than 2s, we kill it.
+            r = requests.get(target_url, headers=headers, timeout=2)
+            
+            if r.status_code == 200:
+                with open(save_path, 'wb') as f:
+                    f.write(r.content)
+                print(f"[OK] {save_path}", flush=True)
+                return
+            
+            elif r.status_code == 404:
+                # Instant fail for missing files
+                return 
+            
+        except Exception:
+            # If timeout or error, just try one more time or skip
+            pass
     
-    # Tiny sleep to allow the connection to close properly
-    time.sleep(0.1)
+    # If we get here, it timed out twice. Move on.
+    # We don't print "Fail" to keep logs clean, just skip it.
 
-print("--- STARTING UPDATE CHECK ---", flush=True)
+print("--- STARTING SPEED RUN ---", flush=True)
 
 # 1. Backgrounds
-print(f"Scanning 1-{MAX_BACKGROUNDS} Backgrounds...", flush=True)
+print(">>> Scanning Backgrounds...", flush=True)
 for i in range(1, MAX_BACKGROUNDS + 1):
-    # Black Shield
     path = f"/1/{i}/0xCCCCCC/0x000000/60_60-0.png"
-    download_file(path, f"backgrounds/{i}.png")
+    download_file(path, f"{ASSET_DIR}/backgrounds/{i}.png")
 
 # 2. Motifs
-print(f"Scanning 1-{MAX_MOTIFS} Motifs...", flush=True)
+print(">>> Scanning Motifs...", flush=True)
 for i in range(1, MAX_MOTIFS + 1):
-    # White Icon
     path = f"/{i}/1/0xFFFFFF/0x333333/60_60-0.png"
-    download_file(path, f"motifs/{i}.png")
+    download_file(path, f"{ASSET_DIR}/motifs/{i}.png")
 
-print("--- UPDATE COMPLETE ---", flush=True)
+print("--- JOB DONE ---", flush=True)
