@@ -1,76 +1,67 @@
 import os
 import requests
 import time
-import urllib.parse
 
-# --- CONFIGURATION ---
+# CONFIG
 MAX_BACKGROUNDS = 100 
-MAX_MOTIFS = 1500
+MAX_MOTIFS = 1200
 
-# PROXY: We use corsproxy.io as requested
-# It acts as a tunnel to Ankama
+# Using the IO Proxy as requested
 PROXY_BASE = "https://corsproxy.io/?"
+ANKAMA_BASE = "https://static.ankama.com/dofus/renderer/emblem"
 
 # Create folders
 os.makedirs("backgrounds", exist_ok=True)
 os.makedirs("motifs", exist_ok=True)
 
-def download_file(ankama_url, save_path):
+def download_file(ankama_path, save_path):
     if os.path.exists(save_path):
+        print(f"[SKIP] {save_path}", flush=True)
         return 
     
-    # Retry loop (Try 3 times)
-    for attempt in range(3):
-        try:
-            # Construct the Proxy URL
-            # Format: https://corsproxy.io/?https://static.ankama...
-            target_url = PROXY_BASE + ankama_url
+    # Construct URL: Proxy + Ankama
+    # Example: https://corsproxy.io/?https://static.ankama.com/...
+    target_url = PROXY_BASE + ANKAMA_BASE + ankama_path
+    
+    try:
+        # User-Agent to look like a browser
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        
+        r = requests.get(target_url, headers=headers, timeout=20)
+        
+        if r.status_code == 200:
+            with open(save_path, 'wb') as f:
+                f.write(r.content)
+            # flush=True makes this show up IMMEDIATELY in logs
+            print(f"[OK] {save_path}", flush=True)
+        else:
+            # 404 is normal for gaps
+            # Print only if it's NOT a 404 so we don't spam errors for empty IDs
+            if r.status_code != 404:
+                print(f"[ERR] {r.status_code} for {save_path}", flush=True)
             
-            # Headers to look like a browser accessing the proxy
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36',
-                'Origin': 'https://github.com'
-            }
-            
-            r = requests.get(target_url, headers=headers, timeout=20)
-            
-            if r.status_code == 200:
-                with open(save_path, 'wb') as f:
-                    f.write(r.content)
-                print(f"[OK] {save_path}")
-                return # Success, exit function
-            
-            elif r.status_code == 404:
-                # Real 404 from Ankama means image doesn't exist. Don't retry.
-                # print(f"[404] Gap at {save_path}")
-                return 
-            
-            else:
-                # Other error (403, 500, etc) - wait and retry
-                time.sleep(2)
-                
-        except Exception as e:
-            print(f"[ERR] Attempt {attempt+1}: {e}")
-            time.sleep(1)
-            
-    print(f"[FAIL] Gave up on {save_path}")
+    except Exception as e:
+        print(f"[EXC] {e}", flush=True)
+    
+    # Sleep 0.2s to be polite
+    time.sleep(0.2) 
 
-print("--- Starting IO Proxy Harvest ---")
-
-BASE = "https://static.ankama.com/dofus/renderer/emblem"
+print("--- STARTING FAST HARVEST (IO) ---", flush=True)
 
 # 1. Backgrounds
-print(">>> Downloading Backgrounds...")
+print(">>> Downloading Backgrounds...", flush=True)
 for i in range(1, MAX_BACKGROUNDS + 1):
     # Black Shield
-    url = f"{BASE}/1/{i}/0xCCCCCC/0x000000/60_60-0.png"
-    download_file(url, f"backgrounds/{i}.png")
+    path = f"/1/{i}/0xCCCCCC/0x000000/60_60-0.png"
+    download_file(path, f"backgrounds/{i}.png")
 
 # 2. Motifs
-print(">>> Downloading Motifs...")
+print(">>> Downloading Motifs...", flush=True)
 for i in range(1, MAX_MOTIFS + 1):
     # White Icon
-    url = f"{BASE}/{i}/1/0xFFFFFF/0x333333/60_60-0.png"
-    download_file(url, f"motifs/{i}.png")
+    path = f"/{i}/1/0xFFFFFF/0x333333/60_60-0.png"
+    download_file(path, f"motifs/{i}.png")
 
-print("--- Job Complete ---")
+print("--- JOB DONE ---", flush=True)
