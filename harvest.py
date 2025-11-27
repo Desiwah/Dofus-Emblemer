@@ -3,12 +3,11 @@ import requests
 import time
 
 # CONFIG
-# We stick to the known ranges. If Ankama adds more, we increase these numbers.
 MAX_BACKGROUNDS = 100 
-MAX_MOTIFS = 1000
+MAX_MOTIFS = 1200
 BASE_URL = "https://static.ankama.com/dofus/renderer/emblem"
 
-# Folders
+# Create folders
 os.makedirs("backgrounds", exist_ok=True)
 os.makedirs("motifs", exist_ok=True)
 
@@ -35,7 +34,7 @@ for i in range(1, MAX_BACKGROUNDS + 1):
     download_if_missing(url, f"backgrounds/{i}.png")
 
 print("--- Updating Motifs ---")
-for i in range(1, MAX_ICONS + 1):
+for i in range(1, MAX_MOTIFS + 1):
     # White Icon
     url = f"{BASE_URL}/{i}/1/0xFFFFFF/0x333333/60_60-0.png"
     download_if_missing(url, f"motifs/{i}.png")
