@@ -30,6 +30,7 @@ jobs:
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
-          git add backgrounds/*.png motifs/*.png
-          # Only commit if there are changes
+          # Force add new files in specific folders
+          git add backgrounds/ motifs/
+          # Only commit if there are actual changes
           git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update assets" && git push)
