@@ -3,57 +3,79 @@ import requests
 import time
 
 # --- CONFIGURATION ---
-MAX_BACKGROUNDS = 100 
-MAX_MOTIFS = 1200
-
-# We use wsrv.nl to proxy the request. 
-# Ankama sees the request coming from them, not you.
-# We append &output=png to ensure we get a clean image file.
-PROXY_BASE = "https://wsrv.nl/?url=static.ankama.com/dofus/renderer/emblem"
+MAX_BACKGROUNDS = 85
+MAX_MOTIFS = 1500
+BASE_URL = "https://static.ankama.com/dofus/renderer/emblem"
 
 # Create folders
 os.makedirs("backgrounds", exist_ok=True)
 os.makedirs("motifs", exist_ok=True)
 
-def download_via_proxy(ankama_path, save_path):
-    if os.path.exists(save_path):
-        print(f"[SKIP] {save_path}")
+# Headers to look like a real browser
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+    'Referer': 'https://www.dofus.com/'
+}
+
+def download_with_retry(url, path):
+    if os.path.exists(path):
         return 
     
-    try:
-        # Construct the Proxy URL
-        # URL structure: https://wsrv.nl/?url=static.ankama.../path&output=png
-        url = f"{PROXY_BASE}{ankama_path}&output=png"
-        
-        # We don't need complex headers for the proxy, standard is fine
-        r = requests.get(url, timeout=20)
-        
-        if r.status_code == 200:
-            with open(save_path, 'wb') as f:
-                f.write(r.content)
-            print(f"[OK] {save_path}")
-        else:
-            # If the proxy returns 404, it means the image doesn't exist on Ankama
-            print(f"[MISSING] {save_path} (Status: {r.status_code})")
+    attempts = 0
+    while attempts < 5:
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=10)
             
-    except Exception as e:
-        print(f"[ERROR] {save_path}: {e}")
-    
-    # Sleep is still good to be polite to the free proxy service
-    time.sleep(0.1) 
+            # SUCCESS
+            if r.status_code == 200:
+                with open(path, 'wb') as f:
+                    f.write(r.content)
+                print(f"[OK] {path}")
+                return
+            
+            # RENDERING (WAIT AND RETRY)
+            elif r.status_code == 202:
+                print(f"[WAIT] {path} is generating... (202)")
+                time.sleep(1.5) # Wait for server to render
+                attempts += 1
+                continue # Retry loop
+            
+            # BLOCKED (WAIT LONGER)
+            elif r.status_code == 403 or r.status_code == 429:
+                print(f"[BLOCKED] Rate limit. Sleeping 10s...")
+                time.sleep(10)
+                attempts += 1
+                continue
 
-print("--- Downloading Backgrounds via Proxy ---")
+            # NOT FOUND
+            elif r.status_code == 404:
+                # Normal for gaps
+                return
+            
+            else:
+                print(f"[ERR] {r.status_code}: {url}")
+                return
+
+        except Exception as e:
+            print(f"[EXC] {e}")
+            time.sleep(1)
+            attempts += 1
+            
+    print(f"[FAIL] Could not download {path} after retries.")
+
+print("--- STARTING SMART HARVEST ---")
+
+# 1. Backgrounds
 for i in range(1, MAX_BACKGROUNDS + 1):
-    # Path: /1/ID/0xCCCCCC/0x000000/60_60-0.png
-    # Black Shield, Grey Icon
-    path = f"/1/{i}/0xCCCCCC/0x000000/60_60-0.png"
-    download_via_proxy(path, f"backgrounds/{i}.png")
+    url = f"{BASE_URL}/1/{i}/0xCCCCCC/0x000000/60_60-0.png"
+    download_with_retry(url, f"backgrounds/{i}.png")
+    time.sleep(0.1)
 
-print("--- Downloading Motifs via Proxy ---")
+# 2. Motifs
 for i in range(1, MAX_MOTIFS + 1):
-    # Path: /ID/1/0xFFFFFF/0x333333/60_60-0.png
-    # White Icon, Grey Shield
-    path = f"/{i}/1/0xFFFFFF/0x333333/60_60-0.png"
-    download_via_proxy(path, f"motifs/{i}.png")
+    url = f"{BASE_URL}/{i}/1/0xFFFFFF/0x333333/60_60-0.png"
+    download_with_retry(url, f"motifs/{i}.png")
+    time.sleep(0.1)
 
-print("--- Harvest Complete ---")
+print("--- DONE ---")
