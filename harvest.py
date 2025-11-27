@@ -1,78 +1,58 @@
 import os
 import requests
-import concurrent.futures
+import time
 
 # --- CONFIGURATION ---
-MAX_BACKGROUNDS = 100
+MAX_BACKGROUNDS = 100 
 MAX_MOTIFS = 2000
-MAX_THREADS = 20  # How many downloads at once?
 
-PROXY_BASE = "https://corsproxy.io/?"
-ANKAMA_BASE = "https://static.ankama.com/dofus/renderer/emblem"
+# We use wsrv.nl because it returns 404s faster than corsproxy
+PROXY_BASE = "https://wsrv.nl/?url=static.ankama.com/dofus/renderer/emblem"
 ASSET_DIR = "assets"
 
 os.makedirs(f"{ASSET_DIR}/backgrounds", exist_ok=True)
 os.makedirs(f"{ASSET_DIR}/motifs", exist_ok=True)
 
-def process_image(args):
-    id, type_name = args
-    
-    # Define paths based on type
-    if type_name == 'background':
-        ankama_path = f"/1/{id}/0xCCCCCC/0x000000/60_60-0.png"
-        save_path = f"{ASSET_DIR}/backgrounds/{id}.png"
-    else:
-        ankama_path = f"/{id}/1/0xFFFFFF/0x333333/60_60-0.png"
-        save_path = f"{ASSET_DIR}/motifs/{id}.png"
-
-    # Skip if exists
+def download_file(ankama_path, save_path):
     if os.path.exists(save_path):
-        return f"[SKIP] {save_path}"
-
-    target_url = PROXY_BASE + ANKAMA_BASE + ankama_path
-    headers = {'User-Agent': 'Mozilla/5.0'}
-
+        return 
+    
+    # &n=-1 tells wsrv to not wait/queue, just fail fast if needed
+    target_url = f"{PROXY_BASE}{ankama_path}&output=png&n=-1"
+    
     try:
-        # 3 second timeout is plenty if running parallel
-        r = requests.get(target_url, headers=headers, timeout=3)
+        # TIMEOUT = 2 SECONDS. 
+        # If it takes longer than 2s, it's definitely a gap. Kill it.
+        r = requests.get(target_url, timeout=2)
         
         if r.status_code == 200:
             with open(save_path, 'wb') as f:
                 f.write(r.content)
-            return f"[OK] {save_path}"
-        else:
-            return f"[MISSING] {save_path}" # Silent fail for gaps
+            print(f"[OK] {save_path}", flush=True)
             
-    except:
-        return f"[TIMEOUT] {save_path}"
+        elif r.status_code == 404 or r.status_code == 400:
+            # 404 = Missing (Gap)
+            print(f"[GAP] {save_path} (Missing)", flush=True)
+            
+        else:
+            print(f"[ERR] Status {r.status_code}", flush=True)
 
-def run_harvest():
-    print(f"--- STARTING MULTI-THREADED HARVEST ({MAX_THREADS} threads) ---")
-    
-    # Prepare list of tasks
-    tasks = []
-    
-    # Add Backgrounds to queue
-    for i in range(1, MAX_BACKGROUNDS + 1):
-        tasks.append((i, 'background'))
-        
-    # Add Motifs to queue
-    for i in range(1, MAX_MOTIFS + 1):
-        tasks.append((i, 'motif'))
+    except Exception:
+        # If it times out, we assume it's a gap and just move on instantly
+        print(f"[SKIP] {save_path} (Timeout)", flush=True)
 
-    print(f"Queue size: {len(tasks)} images. Processing...")
+print("--- STARTING BULLDOZER HARVEST ---", flush=True)
 
-    # Run in parallel
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-        results = executor.map(process_image, tasks)
-        
-        # Print results as they come in
-        for result in results:
-            # Only print OK to keep logs clean, or print everything if you want to see speed
-            if "[OK]" in result:
-                print(result, flush=True)
+# 1. Backgrounds
+print(">>> Scanning Backgrounds...", flush=True)
+for i in range(1, MAX_BACKGROUNDS + 1):
+    path = f"/1/{i}/0xCCCCCC/0x000000/60_60-0.png"
+    download_file(path, f"{ASSET_DIR}/backgrounds/{i}.png")
 
-    print("--- JOB DONE ---")
+# 2. Motifs
+print(">>> Scanning Motifs...", flush=True)
+for i in range(1, MAX_MOTIFS + 1):
+    path = f"/{i}/1/0xFFFFFF/0x333333/60_60-0.png"
+    download_file(path, f"{ASSET_DIR}/motifs/{i}.png")
 
-if __name__ == "__main__":
-    run_harvest()
+print("--- JOB DONE ---", flush=True)
