@@ -1,0 +1,35 @@
+name: Daily Dofus Asset Update
+
+on:
+  schedule:
+    - cron: '0 4 * * *' # Runs at 04:00 UTC every day
+  workflow_dispatch: # Allows you to click "Run Now" manually
+
+permissions:
+  contents: write
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Requests
+        run: pip install requests
+
+      - name: Run Harvester
+        run: python harvest.py
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git add backgrounds/*.png motifs/*.png
+          # Only commit if there are changes
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update assets" && git push)
