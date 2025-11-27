@@ -4,8 +4,8 @@ import time
 
 # CONFIG
 # We stick to the known ranges. If Ankama adds more, we increase these numbers.
-MAX_SHIELDS = 100 
-MAX_ICONS = 2500
+MAX_BACKGROUNDS = 100 
+MAX_MOTIFS = 1000
 BASE_URL = "https://static.ankama.com/dofus/renderer/emblem"
 
 # Folders
