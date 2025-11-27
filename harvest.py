@@ -1,10 +1,9 @@
 import os
 import requests
 import time
-import random
 
 # CONFIG
-MAX_BACKGROUNDS = 100
+MAX_BACKGROUNDS = 100 
 MAX_MOTIFS = 1200
 BASE_URL = "https://static.ankama.com/dofus/renderer/emblem"
 
@@ -17,7 +16,7 @@ def download_if_missing(url, path):
         return 
     
     try:
-        # HEADERS: Make Ankama think we are a real PC
+        # HEADERS: Make Ankama think we are a real PC (Critical Fix)
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
@@ -32,14 +31,11 @@ def download_if_missing(url, path):
                 f.write(r.content)
             print(f"OK: {path}")
         else:
-            # If 404, it just means that specific ID doesn't exist (gaps are normal)
-            # If 202/403, it means blocked, but we print to debug
-            pass 
+            print(f"Missing ({r.status_code}): {path}")
             
     except Exception as e:
         print(f"Error: {e}")
     
-    # Sleep to prevent blocking
     time.sleep(0.05) 
 
 print("--- Updating Backgrounds ---")
