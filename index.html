@@ -417,27 +417,35 @@
         };
 
         window.onload = function () {
-            // 1. Force the app to read the values the browser "remembered"
+            // 1. Get Colors (Text Inputs)
             let savedBg = cleanHex(dom.bgHex.value);
             let savedIcon = cleanHex(dom.iconHex.value);
 
-            // Update internal state immediately
+            // 2. Get IDs (Number Inputs) - Explicitly parse them
+            // We use the input value if it exists, otherwise default to 1
+            let savedBgId = parseInt(dom.manualShield.value);
+            if (isNaN(savedBgId)) savedBgId = 1;
+
+            let savedIconId = parseInt(dom.manualIcon.value);
+            if (isNaN(savedIconId)) savedIconId = 1;
+
+            // 3. Update App State
             appState.bgHex = '0x' + savedBg;
             appState.motifHex = '0x' + savedIcon;
-            appState.bgId = parseInt(dom.manualShield.value) || 1;
-            appState.motifId = parseInt(dom.manualIcon.value) || 1;
+            appState.bgId = savedBgId;
+            appState.motifId = savedIconId;
 
-            // Update the color pickers and visual squares to match
+            // 4. Sync Visual Controls
             dom.bgPicker.value = '#' + savedBg;
             dom.bgBox.style.backgroundColor = '#' + savedBg;
             dom.iconPicker.value = '#' + savedIcon;
             dom.iconBox.style.backgroundColor = '#' + savedIcon;
 
-            // 2. Load the grids
+            // 5. Start Loading Grids
             startWaterfall(dom.bgGrid, 1, MAX_BGS, 'bg', dom.bgStatus);
             startWaterfall(dom.motifGrid, 1, MAX_MOTIFS, 'motif', dom.motifStatus);
 
-            // 3. Show the correct preview
+            // 6. Force Preview Update
             refreshPreview();
             initListeners();
         };
