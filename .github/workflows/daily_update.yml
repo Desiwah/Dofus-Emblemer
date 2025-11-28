@@ -1,0 +1,34 @@
+name: Daily Dofus Asset Update
+on:
+  schedule:
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - run: pip install requests
+      
+      - name: Run Harvester
+        env:
+          PROXY_URL: ${{ secrets.PROXY_URL }}
+        run: python harvest.py
+
+      - name: Commit New Assets
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add assets/ || true
+          git commit -m "Auto-update assets" || echo "Nothing to commit"
+          git pull --rebase
+          git push || echo "No changes to push"
