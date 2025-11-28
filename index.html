@@ -417,18 +417,28 @@
         };
 
         window.onload = function () {
-            // Sync JS state with browser-cached input values
-            if (dom.bgHex.value) updateFromHex('bg', cleanHex(dom.bgHex.value));
-            if (dom.iconHex.value) updateFromHex('motif', cleanHex(dom.iconHex.value));
+            // 1. Force the app to read the values the browser "remembered"
+            let savedBg = cleanHex(dom.bgHex.value);
+            let savedIcon = cleanHex(dom.iconHex.value);
 
-            // Sync cached IDs
+            // Update internal state immediately
+            appState.bgHex = '0x' + savedBg;
+            appState.motifHex = '0x' + savedIcon;
             appState.bgId = parseInt(dom.manualShield.value) || 1;
             appState.motifId = parseInt(dom.manualIcon.value) || 1;
 
+            // Update the color pickers and visual squares to match
+            dom.bgPicker.value = '#' + savedBg;
+            dom.bgBox.style.backgroundColor = '#' + savedBg;
+            dom.iconPicker.value = '#' + savedIcon;
+            dom.iconBox.style.backgroundColor = '#' + savedIcon;
+
+            // 2. Load the grids
             startWaterfall(dom.bgGrid, 1, MAX_BGS, 'bg', dom.bgStatus);
             startWaterfall(dom.motifGrid, 1, MAX_MOTIFS, 'motif', dom.motifStatus);
 
-            // No need to call refreshPreview() here because updateFromHex already triggered it
+            // 3. Show the correct preview
+            refreshPreview();
             initListeners();
         };
 
