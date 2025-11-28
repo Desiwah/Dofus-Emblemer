@@ -24,10 +24,11 @@ jobs:
           PROXY_URL: ${{ secrets.PROXY_URL }}
         run: python harvest.py
 
-      - name: Commit Assets
+      - name: Commit New Assets
         run: |
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
           git add assets/ || true
           git commit -m "Auto-update assets" || echo "Nothing to commit"
+          git pull --rebase
           git push || echo "No changes to push"
