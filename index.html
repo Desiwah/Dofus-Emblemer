@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="referrer" content="no-referrer">
+    <title>Dofus Emblemer</title>
+    <style>
+        /* DARK THEME */
+        body {
+            background-color: #1a1a1a;
+            color: #ecf0f1;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        h2 {
+            text-align: center;
+            color: #ffffff;
+            margin: 0 0 5px 0;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #aaa;
+            font-size: 14px;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+
+        /* LAYOUT */
+        .container {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        .column {
+            background: #2c2c2c;
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .col-left,
+        .col-right {
+            flex: 1;
+            border: 1px solid #444;
+            position: relative;
+            min-height: 0;
+        }
+
+        .col-center {
+            flex: 0 0 350px;
+            align-items: center;
+            padding-top: 10px;
+            border: 1px solid #444;
+        }
+
+        /* STATUS BAR */
+        .status-bar {
+            background: #222;
+            color: #ffffff;
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            font-weight: bold;
+            border: 1px solid #444;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .grid {
+            display: grid;
+            /* Set column width to 60px (the size of item-box) and repeat as many as fit (auto-fit) */
+            grid-template-columns: repeat(auto-fit, 60px);
+            gap: 15px;
+            /* This centers the entire block of columns within the grid container */
+            justify-content: center;
+            /* This makes all items start from the left of their grid cell (required with grid) */
+            justify-items: start;
+
+            padding: 0px 10px;
+            align-content: flex-start;
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* ITEM BOXES */
+        .item-box {
+            width: 60px;
+            height: 60px;
+            background: #333;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+            display: none;
+            /* Hidden by default until loaded */
+            align-items: center;
+            justify-content: center;
+        }
+
+        .item-box.visible {
+            display: flex;
+            animation: popIn 0.2s ease-out;
+        }
+
+        .item-box:hover {
+            border-color: #7f8c8d;
+            background: #444;
+        }
+
+        .item-box.selected {
+            border-color: #ffffff;
+            background: #555;
+            border-width: 2px;
+        }
+
+        .item-box img {
+            max-width: 45px;
+            max-height: 45px;
+        }
+
+        .id-tag {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            font-size: 9px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 1px 3px;
+            border-radius: 3px;
+            pointer-events: none;
+        }
+
+        /* PREVIEW */
+        .preview-wrapper {
+            position: relative;
+            width: 250px;
+            height: 250px;
+            margin-bottom: 25px;
+        }
+
+        .preview-img {
+            width: 100%;
+            height: 100%;
+            border: 1px solid #555;
+            border-radius: 10px;
+            background-image: linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%);
+            background-size: 20px 20px;
+        }
+
+        /* CONTROLS */
+        .swap-container {
+            display: flex;
+            justify-content: center;
+            margin: -15px 0 5px 0;
+            z-index: 5;
+            position: relative;
+        }
+
+        .swap-btn {
+            background: #222;
+            border: 1px solid #555;
+            color: #888;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            margin: 10px;
+        }
+
+        .swap-btn:hover {
+            background: #444;
+            color: #fff;
+            border-color: #fff;
+            transform: rotate(180deg);
+        }
+
+        .control-group {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 15px;
+            font-weight: bold;
+            font-size: 14px;
+            color: #ddd;
+        }
+
+        .color-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input[type="text"].hex-input {
+            width: 70px;
+            /* Reduced width */
+            padding: 8px 8px 8px 20px;
+            /* Added left padding for the # */
+            border-radius: 4px;
+            border: 1px solid #555;
+            background: #111;
+            color: #fff;
+            font-family: monospace;
+            text-align: center;
+            /* Must be left-aligned now */
+        }
+
+        .color-wrapper {
+            position: relative;
+            width: 36px;
+            height: 36px;
+            border-radius: 4px;
+            border: 1px solid #555;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        input[type="color"] {
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            cursor: pointer;
+            border: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        button.copy-btn {
+            background: #f1c40f;
+            color: #111;
+            border: none;
+            padding: 12px 20px;
+            margin-bottom: 15px;
+            margin-top: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .url-box {
+            width: 90%;
+            background: #111;
+            color: #aaa;
+            border: 1px solid #444;
+            padding: 8px;
+            font-size: 11px;
+            margin-top: 5px;
+            border-radius: 4px;
+            resize: none;
+        }
+
+        .manual-input-group {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #444;
+        }
+
+        .manual-input {
+            width: 50px;
+            padding: 5px;
+            background: #222;
+            border: 1px solid #555;
+            color: white;
+            text-align: center;
+        }
+
+        .hex-input-wrapper {
+            position: relative;
+            /* Allows absolute positioning of the # symbol */
+            width: 110px;
+            /* Sum of input width (70px) + padding (8+8+25-8=33px) should approximate total width */
+            display: inline-block;
+        }
+
+        .hex-input-wrapper::before {
+            content: "#";
+            position: absolute;
+            top: 50%;
+            left: 25px;
+            /* Adjust this value to position the # correctly */
+            transform: translateY(-50%);
+            color: #fff;
+            /* Match your text color */
+            font-family: monospace;
+            pointer-events: none;
+            /* Crucial: ensures the text input is still clickable */
+            z-index: 1;
+        }
+
+        @keyframes popIn {
+            from {
+                opacity: 0;
+                transform: scale(0.1);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>Dofus Emblemer</h2>
+    <p class="subtitle"></p>
+
+    <div class="container">
+        <div class="column col-left">
+            <div id="statusShield" class="status-bar">Loading Backgrounds...</div>
+            <div id="bgGrid" class="grid"></div>
+        </div>
+
+        <div class="column col-center">
+
+            <div class="control-group manual-input-group">
+                <label style="color:#ffffff;">Manual ID Override</label>
+                <div style="display:flex; justify-content:center; gap:10px;">
+                    <div>
+                        <div style="font-size:10px; color:#aaa;">BG ID</div><input type="number" id="manualShieldId"
+                            class="manual-input" value="1">
+                    </div>
+                    <div>
+                        <div style="font-size:10px; color:#aaa;">Motif ID</div><input type="number" id="manualIconId"
+                            class="manual-input" value="176">
+                    </div>
+                </div>
+            </div>
+
+            <div class="preview-wrapper"><img id="preview" class="preview-img" src="" alt="Preview"
+                    referrerpolicy="no-referrer"></div>
+
+            <div class="control-group">
+                <label>Background Color</label>
+                <div class="color-row">
+                    <div class="hex-input-wrapper">
+                        <input type="text" id="shieldHexText" class="hex-input" value="464646" maxlength="6">
+                    </div>
+                    <div class="color-wrapper" style="background-color: #464646;" id="shieldColorBg"><input type="color"
+                            id="shieldColorPicker" value="#464646"></div>
+                </div>
+            </div>
+
+            <div class="swap-container">
+                <button class="swap-btn" onclick="swapColors()" title="Swap Colors">⇅</button>
+            </div>
+
+            <div class="control-group">
+                <label>Motif Color</label>
+                <div class="color-row">
+                    <div class="hex-input-wrapper">
+                        <input type="text" id="iconHexText" class="hex-input" value="EAEAEA" maxlength="6">
+                    </div>
+                    <div class="color-wrapper" style="background-color: #EAEAEA;" id="iconColorBg"><input type="color"
+                            id="iconColorPicker" value="#EAEAEA"></div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <button class="copy-btn" onclick="copyLink()">Copy Image Link</button>
+                <textarea id="resultUrl" class="url-box" rows="3" readonly></textarea>
+            </div>
+        </div>
+
+        <div class="column col-right">
+            <div id="statusIcon" class="status-bar">Loading Motifs...</div>
+            <div id="motifGrid" class="grid"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        // Make sure these match how many images you downloaded
+        const MAX_BACKGROUNDS = 200;
+        const MAX_MOTIFS = 1200;
+
+        // Limits the loop to keep browser responsive
+        const BATCH_SIZE = 50;
+        const SPEED = 50;
+
+        let state = { motifId: 1, bgId: 1, bgHex: "0x464646", motifHex: "0xEAEAEA" };
+
+        const bgGrid = document.getElementById('bgGrid');
+        const motifGrid = document.getElementById('motifGrid');
+        const previewImg = document.getElementById('preview');
+        const urlBox = document.getElementById('resultUrl');
+        const manualIconInput = document.getElementById('manualIconId');
+        const manualShieldInput = document.getElementById('manualShieldId');
+        const bgStatus = document.getElementById('statusShield');
+        const motifStatus = document.getElementById('statusIcon');
+
+        const sText = document.getElementById('shieldHexText');
+        const sPicker = document.getElementById('shieldColorPicker');
+        const sBg = document.getElementById('shieldColorBg');
+        const iText = document.getElementById('iconHexText');
+        const iPicker = document.getElementById('iconColorPicker');
+        const iBg = document.getElementById('iconColorBg');
+
+        function init() {
+            startWaterfall(bgGrid, 1, MAX_BACKGROUNDS, 'bg', bgStatus);
+            startWaterfall(motifGrid, 1, MAX_MOTIFS, 'motif', motifStatus);
+            updatePreview();
+            setupListeners();
+        }
+
+        function startWaterfall(container, start, max, type, statusLabel) {
+            let cursor = start;
+
+            let interval = setInterval(() => {
+                if (cursor > max) {
+                    clearInterval(interval);
+                    statusLabel.innerText = (type === 'bg') ? 'Backgrounds' : 'Motifs';
+                    return;
+                }
+
+                let end = Math.min(cursor + BATCH_SIZE, max);
+                // Optional: Don't show status text if it's too fast, but good for debugging
+                // statusLabel.innerText = `Loading: ${cursor}...`;
+
+                for (let i = cursor; i < end; i++) {
+                    checkAndAppend(container, i, type);
+                }
+                cursor += BATCH_SIZE;
+
+            }, SPEED);
+        }
+
+        function checkAndAppend(container, id, type) {
+            // USE GITHUB RAW ASSETS
+            let src = "";
+            const repoBase = "https://raw.githubusercontent.com/Desiwah/Dofus-Emblemer/main/assets";
+
+            if (type === 'bg') {
+                src = `${repoBase}/backgrounds/${id}.png`;
+            } else {
+                src = `${repoBase}/motifs/${id}.png`;
+            }
+
+            // 1. Create Placeholder immediately (Maintains 1, 2, 3 order)
+            let div = document.createElement('div');
+            div.className = 'item-box';
+            div.innerHTML = `<div class="id-tag">${id}</div>`;
+            container.appendChild(div);
+
+            // 2. Load Image
+            let img = new Image();
+
+            img.onload = function () {
+                div.appendChild(img);
+
+                div.onclick = () => {
+                    let old = container.querySelector('.selected');
+                    if (old) old.classList.remove('selected');
+                    div.classList.add('selected');
+                    if (type === 'bg') { state.bgId = id; manualShieldInput.value = id; }
+                    else { state.motifId = id; manualIconInput.value = id; }
+                    updatePreview();
+                };
+
+                // Only show if image successfully loaded (No empty boxes)
+                div.classList.add('visible');
+                div.style.display = 'flex';
+            };
+
+            // If file is missing (onerror), it stays display:none (Invisible)
+            // This ensures a clean look with no broken images or empty squares.
+
+            img.src = src;
+        }
+
+        function setupListeners() {
+            sPicker.addEventListener('input', (e) => updateColor('bg', e.target.value));
+            iPicker.addEventListener('input', (e) => updateColor('motif', e.target.value));
+
+            // Helper to handle paste events specifically
+            const handlePaste = (e, type) => {
+                e.preventDefault(); // Bypasses the HTML maxlength limit
+                let pasted = (e.clipboardData || window.clipboardData).getData('text');
+                let hex = cleanHex(pasted);
+                e.target.value = hex; // Sets the cleaned 6-digit value
+                if (hex.length === 6) updateColorFromText(type, hex);
+            };
+
+            // Helper to handle normal typing
+            const handleInput = (e, type) => {
+                let hex = cleanHex(e.target.value);
+                e.target.value = hex;
+                if (hex.length === 6) updateColorFromText(type, hex);
+            };
+
+            sText.addEventListener('input', (e) => handleInput(e, 'bg'));
+            sText.addEventListener('paste', (e) => handlePaste(e, 'bg'));
+
+            iText.addEventListener('input', (e) => handleInput(e, 'motif'));
+            iText.addEventListener('paste', (e) => handlePaste(e, 'motif'));
+
+            manualIconInput.addEventListener('change', (e) => { state.motifId = parseInt(e.target.value) || 1; updatePreview(); });
+            manualShieldInput.addEventListener('change', (e) => { state.bgId = parseInt(e.target.value) || 1; updatePreview(); });
+        }
+
+        function cleanHex(str) { return str.replace(/[^0-9A-Fa-f]/g, '').toUpperCase().substring(0, 6); }
+
+        function updateColor(type, hex) {
+            let clean = hex.replace('#', '0x').toUpperCase();
+            if (type === 'bg') { state.bgHex = clean; sText.value = hex.substring(1).toUpperCase(); sBg.style.backgroundColor = hex; }
+            else { state.motifHex = clean; iText.value = hex.substring(1).toUpperCase(); iBg.style.backgroundColor = hex; }
+            updatePreview();
+        }
+
+        function updateColorFromText(type, hex) {
+            let color = "#" + hex;
+            if (type === 'bg') { sPicker.value = color; sBg.style.backgroundColor = color; state.bgHex = '0x' + hex; }
+            else { iPicker.value = color; iBg.style.backgroundColor = color; state.motifHex = '0x' + hex; }
+            updatePreview();
+        }
+
+        function updatePreview() {
+            // Force security policy to allow remote image loading for the big preview
+            previewImg.referrerPolicy = "no-referrer";
+
+            const baseUrl = `https://static.ankama.com/dofus/renderer/emblem/${state.motifId}/${state.bgId}/${state.motifHex}/${state.bgHex}/512_512-0.png`;
+
+            // Add timestamp ?v=... to bust browser cache and force reload
+            previewImg.src = `${baseUrl}?v=${Date.now()}`;
+
+            // Keep clean URL for user to copy
+            urlBox.value = baseUrl;
+        }
+
+        function copyLink() {
+            urlBox.select();
+            navigator.clipboard.writeText(urlBox.value);
+            const btn = document.querySelector('button.copy-btn');
+            const originalText = btn.innerText;
+            btn.innerText = "Copied!";
+            btn.style.background = "#2ecc71";
+            setTimeout(() => { btn.innerText = originalText; btn.style.background = "#f1c40f"; }, 1500);
+        }
+
+        function swapColors() {
+            // Swap state values
+            let temp = state.bgHex;
+            state.bgHex = state.motifHex;
+            state.motifHex = temp;
+
+            // Format for inputs (remove 0x or 0X, case insensitive)
+            let bgStr = state.bgHex.replace(/0x/gi, '');
+            let motifStr = state.motifHex.replace(/0x/gi, '');
+
+            // Update Input Text
+            sText.value = bgStr;
+            iText.value = motifStr;
+
+            // Update Color Pickers and visual squares
+            sPicker.value = '#' + bgStr;
+            sBg.style.backgroundColor = '#' + bgStr;
+
+            iPicker.value = '#' + motifStr;
+            iBg.style.backgroundColor = '#' + motifStr;
+
+            updatePreview();
+        }
+
+        init();
+    </script>
+</body>
+
+</html>
