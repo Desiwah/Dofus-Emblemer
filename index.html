@@ -269,13 +269,13 @@
             border-bottom: 1px solid #444;
         }
 
-        .manual-input {
-            width: 50px;
+        .manual-text {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ecf0f1;
             padding: 5px;
-            background: #222;
-            border: 1px solid #555;
-            color: white;
             text-align: center;
+            font-family: monospace;
         }
 
         .hex-input-wrapper {
@@ -324,15 +324,15 @@
         <div class="column col-center">
 
             <div class="control-group manual-input-group">
-                <label style="color:#ffffff;">Manual ID Override</label>
-                <div style="display:flex; justify-content:center; gap:10px;">
+                <label style="color:#ffffff;">Current Selection</label>
+                <div style="display:flex; justify-content:center; gap:30px;">
                     <div>
-                        <div style="font-size:10px; color:#aaa;">BG ID</div>
-                        <input type="number" id="manualShieldId" class="manual-input" value="1">
+                        <div style="font-size:10px; color:#aaa; margin-bottom:2px;">BG ID</div>
+                        <div id="manualShieldId" class="manual-text">1</div>
                     </div>
                     <div>
-                        <div style="font-size:10px; color:#aaa;">Motif ID</div>
-                        <input type="number" id="manualIconId" class="manual-input" value="176">
+                        <div style="font-size:10px; color:#aaa; margin-bottom:2px;">Motif ID</div>
+                        <div id="manualIconId" class="manual-text">176</div>
                     </div>
                 </div>
             </div>
@@ -417,29 +417,28 @@
         };
 
         window.onload = function () {
-            // 1. Get Colors (Text Inputs)
+            // 1. Get Colors (Inputs - Browser remembers these automatically)
             let savedBg = cleanHex(dom.bgHex.value);
             let savedIcon = cleanHex(dom.iconHex.value);
 
-            // 2. Get IDs (Number Inputs) - Explicitly parse them
-            // We use the input value if it exists, otherwise default to 1
-            let savedBgId = parseInt(dom.manualShield.value);
-            if (isNaN(savedBgId)) savedBgId = 1;
-
-            let savedIconId = parseInt(dom.manualIcon.value);
-            if (isNaN(savedIconId)) savedIconId = 1;
+            // 2. Get IDs from LocalStorage (Custom memory)
+            // If nothing is saved, default to 1 and 176
+            appState.bgId = parseInt(localStorage.getItem('dofus_bg_id')) || 1;
+            appState.motifId = parseInt(localStorage.getItem('dofus_motif_id')) || 176;
 
             // 3. Update App State
             appState.bgHex = '0x' + savedBg;
             appState.motifHex = '0x' + savedIcon;
-            appState.bgId = savedBgId;
-            appState.motifId = savedIconId;
 
             // 4. Sync Visual Controls
             dom.bgPicker.value = '#' + savedBg;
             dom.bgBox.style.backgroundColor = '#' + savedBg;
             dom.iconPicker.value = '#' + savedIcon;
             dom.iconBox.style.backgroundColor = '#' + savedIcon;
+
+            // Update the text numbers to match memory
+            dom.manualShield.innerText = appState.bgId;
+            dom.manualIcon.innerText = appState.motifId;
 
             // 5. Start Loading Grids
             startWaterfall(dom.bgGrid, 1, MAX_BGS, 'bg', dom.bgStatus);
@@ -469,17 +468,14 @@
         }
 
         function loadItem(container, id, type) {
-            // using github raw to fetch assets
             const repoBase = "https://raw.githubusercontent.com/Desiwah/Dofus-Emblemer/main/assets";
             let src = (type === 'bg') ? `${repoBase}/backgrounds/${id}.png` : `${repoBase}/motifs/${id}.png`;
 
-            // create placeholder
             let div = document.createElement('div');
             div.className = 'item-box';
             div.innerHTML = `<div class="id-tag">${id}</div>`;
             container.appendChild(div);
 
-            // load image
             let img = new Image();
             img.onload = function () {
                 div.appendChild(img);
@@ -490,10 +486,14 @@
 
                     if (type === 'bg') {
                         appState.bgId = id;
-                        dom.manualShield.value = id;
+                        dom.manualShield.innerText = id;
+                        // SAVE TO MEMORY
+                        localStorage.setItem('dofus_bg_id', id);
                     } else {
                         appState.motifId = id;
-                        dom.manualIcon.value = id;
+                        dom.manualIcon.innerText = id;
+                        // SAVE TO MEMORY
+                        localStorage.setItem('dofus_motif_id', id);
                     }
                     refreshPreview();
                 };
@@ -507,7 +507,6 @@
             dom.bgPicker.addEventListener('input', (e) => setColor('bg', e.target.value));
             dom.iconPicker.addEventListener('input', (e) => setColor('motif', e.target.value));
 
-            // handle manual typing or pasting
             const handleText = (e, type) => {
                 let val = (e.clipboardData || window.clipboardData) ? (e.clipboardData || window.clipboardData).getData('text') : e.target.value;
                 if (e.type === 'paste') e.preventDefault();
@@ -520,15 +519,6 @@
             ['input', 'paste'].forEach(evt => {
                 dom.bgHex.addEventListener(evt, (e) => handleText(e, 'bg'));
                 dom.iconHex.addEventListener(evt, (e) => handleText(e, 'motif'));
-            });
-
-            dom.manualIcon.addEventListener('change', (e) => {
-                appState.motifId = parseInt(e.target.value) || 1;
-                refreshPreview();
-            });
-            dom.manualShield.addEventListener('change', (e) => {
-                appState.bgId = parseInt(e.target.value) || 1;
-                refreshPreview();
             });
         }
 
