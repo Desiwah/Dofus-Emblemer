@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="referrer" content="no-referrer">
     <title>Dofus Emblemer</title>
+    <link rel="icon" type="image/png"
+        href="https://static.ankama.com/dofus/renderer/emblem/1/1/0xEAEAEA/0x464646/64_64-0.png">
     <style>
         body {
             background-color: #1a1a1a;
@@ -265,7 +267,7 @@
 
         .manual-input-group {
             margin-bottom: 20px;
-            padding-bottom: 20px;
+            padding-bottom: 10px;
             border-bottom: 1px solid #444;
         }
 
@@ -276,6 +278,25 @@
             padding: 5px;
             text-align: center;
             font-family: monospace;
+        }
+
+        .reset-btn {
+            background: transparent;
+            border: 1px dashed #969696; /* Dashed looks nice for a utility action */
+            color: #969696;
+            font-size: 13px;
+            padding: 8px;
+            margin-bottom: 10px; /* Space between this and the yellow button */
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .reset-btn:hover {
+            border-color: #e74c3c; /* Red hover to indicate reset */
+            color: #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
         }
 
         .hex-input-wrapper {
@@ -370,7 +391,8 @@
             </div>
 
             <div class="control-group">
-                <button class="copy-btn" onclick="copyLink()">Copy Image Link</button>
+                <button class="reset-btn" onclick="resetDefaults()">↺ Reset to Defaults</button>
+                <button class="copy-btn" onclick="copyLink()">Copy Link</button>
                 <textarea id="resultUrl" class="url-box" rows="3" readonly></textarea>
             </div>
         </div>
@@ -382,218 +404,234 @@
     </div>
 
     <script>
-        const MAX_BGS = 200;
-        const MAX_MOTIFS = 1200;
+        // Config variables
+        const maxShields = 200;
+        const maxIcons = 1200;
 
-        // Waterfall settings
-        const BATCH = 50;
-        const SPEED = 50;
+        // Tracking current selection
+        let currentShield = 1;
+        let currentIcon = 1;
+        let shieldColor = "0x464646";
+        let iconColor = "0xEAEAEA";
 
-        // Default state
-        let appState = {
-            motifId: 1,
-            bgId: 1,
-            bgHex: "0x464646",
-            motifHex: "0xEAEAEA"
-        };
-
-        const dom = {
-            bgGrid: document.getElementById('bgGrid'),
-            motifGrid: document.getElementById('motifGrid'),
-            preview: document.getElementById('preview'),
-            urlBox: document.getElementById('resultUrl'),
-            manualIcon: document.getElementById('manualIconId'),
-            manualShield: document.getElementById('manualShieldId'),
-            bgStatus: document.getElementById('statusShield'),
-            motifStatus: document.getElementById('statusIcon'),
-
-            // Colors
-            bgHex: document.getElementById('shieldHexText'),
-            bgPicker: document.getElementById('shieldColorPicker'),
-            bgBox: document.getElementById('shieldColorBg'),
-            iconHex: document.getElementById('iconHexText'),
-            iconPicker: document.getElementById('iconColorPicker'),
-            iconBox: document.getElementById('iconColorBg')
-        };
+        // DOM Elements
+        const bgGrid = document.getElementById('bgGrid');
+        const motifGrid = document.getElementById('motifGrid');
+        const preview = document.getElementById('preview');
 
         window.onload = function () {
-            // 1. Get Colors (Inputs - Browser remembers these automatically)
-            let savedBg = cleanHex(dom.bgHex.value);
-            let savedIcon = cleanHex(dom.iconHex.value);
+            // check for saved settings
+            if (localStorage.getItem('dofus_bg_id')) {
+                currentShield = parseInt(localStorage.getItem('dofus_bg_id'));
+            }
+            if (localStorage.getItem('dofus_motif_id')) {
+                currentIcon = parseInt(localStorage.getItem('dofus_motif_id'));
+            }
 
-            // 2. Get IDs from LocalStorage (Custom memory)
-            // If nothing is saved, default to 1 and 1
-            appState.bgId = parseInt(localStorage.getItem('dofus_bg_id')) || 1;
-            appState.motifId = parseInt(localStorage.getItem('dofus_motif_id')) || 1;
+            // Sync the UI texts
+            document.getElementById('manualShieldId').innerText = currentShield;
+            document.getElementById('manualIconId').innerText = currentIcon;
 
-            // 3. Update App State
-            appState.bgHex = '0x' + savedBg;
-            appState.motifHex = '0x' + savedIcon;
+            // Grab colors from inputs (in case browser auto-filled them)
+            let sHex = document.getElementById('shieldHexText').value;
+            let iHex = document.getElementById('iconHexText').value;
 
-            // 4. Sync Visual Controls
-            dom.bgPicker.value = '#' + savedBg;
-            dom.bgBox.style.backgroundColor = '#' + savedBg;
-            dom.iconPicker.value = '#' + savedIcon;
-            dom.iconBox.style.backgroundColor = '#' + savedIcon;
+            // Format them correctly for the API
+            shieldColor = '0x' + fixHex(sHex);
+            iconColor = '0x' + fixHex(iHex);
 
-            // Update the text numbers to match memory
-            dom.manualShield.innerText = appState.bgId;
-            dom.manualIcon.innerText = appState.motifId;
+            // Make sure the color pickers match the text inputs
+            syncColorPickers();
 
-            // 5. Start Loading Grids
-            startWaterfall(dom.bgGrid, 1, MAX_BGS, 'bg', dom.bgStatus);
-            startWaterfall(dom.motifGrid, 1, MAX_MOTIFS, 'motif', dom.motifStatus);
+            // Start loading the images
+            loadImages(bgGrid, maxShields, 'bg');
+            loadImages(motifGrid, maxIcons, 'motif');
 
-            // 6. Force Preview Update
-            refreshPreview();
-            initListeners();
-        };
+            updatePreview();
+            setupEvents();
+        }
 
-        function startWaterfall(container, start, max, type, statusElem) {
-            let cursor = start;
+        // Handles loading images in batches so the page doesn't freeze
+        function loadImages(container, total, type) {
+            let current = 1;
+            let batch = 50;
+            let status = (type == 'bg') ? document.getElementById('statusShield') : document.getElementById('statusIcon');
 
-            let timer = setInterval(() => {
-                if (cursor > max) {
-                    clearInterval(timer);
-                    statusElem.innerText = (type === 'bg') ? 'Backgrounds' : 'Motifs';
+            let loader = setInterval(() => {
+                if (current > total) {
+                    clearInterval(loader);
+                    status.innerText = (type == 'bg') ? "Backgrounds" : "Motifs";
                     return;
                 }
 
-                let end = Math.min(cursor + BATCH, max);
-                for (let i = cursor; i < end; i++) {
-                    loadItem(container, i, type);
+                let end = current + batch;
+                if (end > total) end = total;
+
+                for (let i = current; i < end; i++) {
+                    createItem(container, i, type);
                 }
-                cursor += BATCH;
-            }, SPEED);
+                current += batch;
+            }, 50);
         }
 
-        function loadItem(container, id, type) {
-            const repoBase = "https://raw.githubusercontent.com/Desiwah/Dofus-Emblemer/main/assets";
-            let src = (type === 'bg') ? `${repoBase}/backgrounds/${id}.png` : `${repoBase}/motifs/${id}.png`;
+        function createItem(container, id, type) {
+            let baseUrl = "https://raw.githubusercontent.com/Desiwah/Dofus-Emblemer/main/assets";
+            let path = (type == 'bg') ? `${baseUrl}/backgrounds/${id}.png` : `${baseUrl}/motifs/${id}.png`;
 
-            let div = document.createElement('div');
-            div.className = 'item-box';
-            div.innerHTML = `<div class="id-tag">${id}</div>`;
-            container.appendChild(div);
+            let box = document.createElement('div');
+            box.className = 'item-box';
+            box.innerHTML = `<div class="id-tag">${id}</div>`;
 
             let img = new Image();
-            img.onload = function () {
-                div.appendChild(img);
-                div.onclick = () => {
+            img.onload = () => {
+                box.appendChild(img);
+                box.classList.add('visible'); // triggers the animation
+
+                box.onclick = function () {
+                    // remove old selection
                     let old = container.querySelector('.selected');
                     if (old) old.classList.remove('selected');
-                    div.classList.add('selected');
 
-                    if (type === 'bg') {
-                        appState.bgId = id;
-                        dom.manualShield.innerText = id;
-                        // SAVE TO MEMORY
+                    box.classList.add('selected');
+
+                    // update global state
+                    if (type == 'bg') {
+                        currentShield = id;
+                        document.getElementById('manualShieldId').innerText = id;
                         localStorage.setItem('dofus_bg_id', id);
                     } else {
-                        appState.motifId = id;
-                        dom.manualIcon.innerText = id;
-                        // SAVE TO MEMORY
+                        currentIcon = id;
+                        document.getElementById('manualIconId').innerText = id;
                         localStorage.setItem('dofus_motif_id', id);
                     }
-                    refreshPreview();
-                };
-                div.classList.add('visible');
-                div.style.display = 'flex';
-            };
-            img.src = src;
+                    updatePreview();
+                }
+            }
+            img.src = path;
+            container.appendChild(box);
         }
 
-        function initListeners() {
-            dom.bgPicker.addEventListener('input', (e) => setColor('bg', e.target.value));
-            dom.iconPicker.addEventListener('input', (e) => setColor('motif', e.target.value));
-
-            const handleText = (e, type) => {
-                let val = (e.clipboardData || window.clipboardData) ? (e.clipboardData || window.clipboardData).getData('text') : e.target.value;
-                if (e.type === 'paste') e.preventDefault();
-
-                let hex = cleanHex(val);
-                e.target.value = hex;
-                if (hex.length === 6) updateFromHex(type, hex);
-            };
-
-            ['input', 'paste'].forEach(evt => {
-                dom.bgHex.addEventListener(evt, (e) => handleText(e, 'bg'));
-                dom.iconHex.addEventListener(evt, (e) => handleText(e, 'motif'));
-            });
+        function updatePreview() {
+            let url = `https://static.ankama.com/dofus/renderer/emblem/${currentIcon}/${currentShield}/${iconColor}/${shieldColor}/600_600-0.png`;
+            // add timestamp to force reload
+            preview.src = url + "?v=" + Date.now();
+            document.getElementById('resultUrl').value = url;
         }
 
-        function cleanHex(str) {
+        function fixHex(str) {
+            // removes non-hex chars and ensures uppercase
             return str.replace(/[^0-9A-Fa-f]/g, '').toUpperCase().substring(0, 6);
         }
 
-        function setColor(type, hexStr) {
-            let clean = hexStr.replace('#', '0x').toUpperCase();
-            if (type === 'bg') {
-                appState.bgHex = clean;
-                dom.bgHex.value = hexStr.substring(1).toUpperCase();
-                dom.bgBox.style.backgroundColor = hexStr;
-            } else {
-                appState.motifHex = clean;
-                dom.iconHex.value = hexStr.substring(1).toUpperCase();
-                dom.iconBox.style.backgroundColor = hexStr;
-            }
-            refreshPreview();
+        function syncColorPickers() {
+            let sClean = shieldColor.replace('0x', '#');
+            let iClean = iconColor.replace('0x', '#');
+
+            document.getElementById('shieldColorPicker').value = sClean;
+            document.getElementById('shieldColorBg').style.backgroundColor = sClean;
+
+            document.getElementById('iconColorPicker').value = iClean;
+            document.getElementById('iconColorBg').style.backgroundColor = iClean;
         }
 
-        function updateFromHex(type, hex) {
-            let color = "#" + hex;
-            if (type === 'bg') {
-                dom.bgPicker.value = color;
-                dom.bgBox.style.backgroundColor = color;
-                appState.bgHex = '0x' + hex;
-            } else {
-                dom.iconPicker.value = color;
-                dom.iconBox.style.backgroundColor = color;
-                appState.motifHex = '0x' + hex;
-            }
-            refreshPreview();
+        function setupEvents() {
+            // Shield Color Picker
+            document.getElementById('shieldColorPicker').addEventListener('input', function (e) {
+                let hex = e.target.value.replace('#', '');
+                document.getElementById('shieldHexText').value = hex.toUpperCase();
+                document.getElementById('shieldColorBg').style.backgroundColor = e.target.value;
+                shieldColor = '0x' + hex;
+                updatePreview();
+            });
+
+            // Icon Color Picker
+            document.getElementById('iconColorPicker').addEventListener('input', function (e) {
+                let hex = e.target.value.replace('#', '');
+                document.getElementById('iconHexText').value = hex.toUpperCase();
+                document.getElementById('iconColorBg').style.backgroundColor = e.target.value;
+                iconColor = '0x' + hex;
+                updatePreview();
+            });
+
+            // Manual Hex Input (Shield)
+            document.getElementById('shieldHexText').addEventListener('input', function (e) {
+                let val = fixHex(e.target.value);
+                e.target.value = val;
+                if (val.length === 6) {
+                    shieldColor = '0x' + val;
+                    syncColorPickers();
+                    updatePreview();
+                }
+            });
+
+            // Manual Hex Input (Icon)
+            document.getElementById('iconHexText').addEventListener('input', function (e) {
+                let val = fixHex(e.target.value);
+                e.target.value = val;
+                if (val.length === 6) {
+                    iconColor = '0x' + val;
+                    syncColorPickers();
+                    updatePreview();
+                }
+            });
         }
 
-        function refreshPreview() {
-            dom.preview.referrerPolicy = "no-referrer";
-            // 600x600 appears to be the maximum server-side limit for emblems
-            const url = `https://static.ankama.com/dofus/renderer/emblem/${appState.motifId}/${appState.bgId}/${appState.motifHex}/${appState.bgHex}/600_600-0.png`;
-            dom.preview.src = `${url}?v=${Date.now()}`;
-            dom.urlBox.value = url;
+        // Button Functions
+        function swapColors() {
+            let temp = shieldColor;
+            shieldColor = iconColor;
+            iconColor = temp;
+
+            // update the text boxes
+            document.getElementById('shieldHexText').value = shieldColor.replace('0x', '');
+            document.getElementById('iconHexText').value = iconColor.replace('0x', '');
+
+            syncColorPickers();
+            updatePreview();
+        }
+
+        function resetDefaults() {
+            currentShield = 1;
+            currentIcon = 1;
+            shieldColor = "0x464646";
+            iconColor = "0xEAEAEA";
+
+            // reset inputs
+            document.getElementById('shieldHexText').value = "464646";
+            document.getElementById('iconHexText').value = "EAEAEA";
+
+            // clear selection highlights
+            let allSelected = document.querySelectorAll('.selected');
+            for (let i = 0; i < allSelected.length; i++) {
+                allSelected[i].classList.remove('selected');
+            }
+
+            // update UI numbers
+            document.getElementById('manualShieldId').innerText = 1;
+            document.getElementById('manualIconId').innerText = 1;
+
+            // save
+            localStorage.setItem('dofus_bg_id', 1);
+            localStorage.setItem('dofus_motif_id', 1);
+
+            syncColorPickers();
+            updatePreview();
         }
 
         function copyLink() {
-            dom.urlBox.select();
-            navigator.clipboard.writeText(dom.urlBox.value);
-            const btn = document.querySelector('button.copy-btn');
-            const prevText = btn.innerText;
+            let box = document.getElementById('resultUrl');
+            box.select();
+            navigator.clipboard.writeText(box.value);
 
+            // simple visual feedback
+            let btn = document.querySelector('.copy-btn');
+            let oldText = btn.innerText;
             btn.innerText = "Copied!";
             btn.style.background = "#2ecc71";
             setTimeout(() => {
-                btn.innerText = prevText;
+                btn.innerText = oldText;
                 btn.style.background = "#f1c40f";
-            }, 1500);
-        }
-
-        function swapColors() {
-            let tmp = appState.bgHex;
-            appState.bgHex = appState.motifHex;
-            appState.motifHex = tmp;
-
-            let bgClean = appState.bgHex.replace(/0x/gi, '');
-            let motifClean = appState.motifHex.replace(/0x/gi, '');
-
-            dom.bgHex.value = bgClean;
-            dom.iconHex.value = motifClean;
-
-            dom.bgPicker.value = '#' + bgClean;
-            dom.bgBox.style.backgroundColor = '#' + bgClean;
-
-            dom.iconPicker.value = '#' + motifClean;
-            dom.iconBox.style.backgroundColor = '#' + motifClean;
-
-            refreshPreview();
+            }, 1000);
         }
     </script>
 </body>
