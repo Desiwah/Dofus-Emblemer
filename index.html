@@ -332,7 +332,7 @@
                     </div>
                     <div>
                         <div style="font-size:10px; color:#aaa; margin-bottom:2px;">Motif ID</div>
-                        <div id="manualIconId" class="manual-text">176</div>
+                        <div id="manualIconId" class="manual-text">1</div>
                     </div>
                 </div>
             </div>
@@ -422,9 +422,9 @@
             let savedIcon = cleanHex(dom.iconHex.value);
 
             // 2. Get IDs from LocalStorage (Custom memory)
-            // If nothing is saved, default to 1 and 176
+            // If nothing is saved, default to 1 and 1
             appState.bgId = parseInt(localStorage.getItem('dofus_bg_id')) || 1;
-            appState.motifId = parseInt(localStorage.getItem('dofus_motif_id')) || 176;
+            appState.motifId = parseInt(localStorage.getItem('dofus_motif_id')) || 1;
 
             // 3. Update App State
             appState.bgHex = '0x' + savedBg;
