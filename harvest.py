@@ -3,52 +3,82 @@ import requests
 import time
 import random
 
-# --- CONFIGURATION ---
-MAX_BACKGROUNDS = 200 
-MAX_MOTIFS = 2000 # Increased to match your JS
+# --- CONFIG ---
 BASE_URL = "https://static.ankama.com/dofus/renderer/emblem"
+MIN_DELAY = 3.0
+MAX_DELAY = 7.0
+SCAN_AHEAD_BG = 10     # try next 10 IDs only
+SCAN_AHEAD_MOTIF = 50  # try next 50 IDs only
 
 os.makedirs("assets/backgrounds", exist_ok=True)
 os.makedirs("assets/motifs", exist_ok=True)
 
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-    'Referer': 'https://www.dofus.com/',
-    'Connection': 'keep-alive'
+    "User-Agent": "Mozilla/5.0",
+    "Accept": "image/*",
+    "Referer": "https://www.dofus.com/",
+    "Connection": "keep-alive"
 }
 
-def download_file(url, path):
-    if os.path.exists(path) and os.path.getsize(path) > 1000:
-        return 
+PROXY_URL = os.getenv("PROXY_URL", None)
+PROXIES = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
 
-    print(f"[DOWNLOADING] {path} ...")
-    
+def last_local_id(folder):
+    ids = [int(f.split(".")[0]) for f in os.listdir(folder) if f.endswith(".png")]
+    return max(ids) if ids else 0
+
+def download(url, path):
+    print(f"[?] {path}")
     try:
-        r = requests.get(url, headers=HEADERS, timeout=10)
-        if r.status_code == 200:
-            with open(path, 'wb') as f:
+        r = requests.get(url, headers=HEADERS, proxies=PROXIES, timeout=15)
+        if r.status_code == 200 and len(r.content) > 1000:
+            with open(path, "wb") as f:
                 f.write(r.content)
-            print(f"   -> Success!")
-        elif r.status_code == 403:
-            print("   -> ⚠️ Blocked (403). Pausing for 60s...")
-            time.sleep(60) 
-        else:
-            print(f"   -> Failed: {r.status_code}")
+            print(f" -> Saved")
+            return True
+        if r.status_code == 404:
+            print(" -> 404")
+            return False
+        print(f" -> HTTP {r.status_code}")
+        return False
     except Exception as e:
-        print(f"   -> Error: {e}")
+        print(f" -> Error: {e}")
+        return False
+    finally:
+        time.sleep(random.uniform(MIN_DELAY, MAX_DELAY))
 
-    # Random sleep between 1.0 and 2.5 seconds to look human
-    time.sleep(random.uniform(1.0, 2.5))
+def sync(folder, start, count, bg=False):
+    ids = list(range(start, start + count))
+    random.shuffle(ids)
 
-print("--- STARTING BACKGROUNDS ---")
-for i in range(1, MAX_BACKGROUNDS + 1):
-    # 60x60 Thumbnail
-    url = f"{BASE_URL}/1/{i}/0xCCCCCC/0x000000/60_60-0.png"
-    download_file(url, f"assets/backgrounds/{i}.png")
+    found_new = False
+    for i in ids:
+        if bg:
+            url = f"{BASE_URL}/1/{i}/0xCCCCCC/0x000000/60_60-0.png"
+            path = f"assets/backgrounds/{i}.png"
+        else:
+            url = f"{BASE_URL}/{i}/1/0xFFFFFF/0x333333/60_60-0.png"
+            path = f"assets/motifs/{i}.png"
 
-print("--- STARTING MOTIFS ---")
-for i in range(1, MAX_MOTIFS + 1):
-    # 60x60 Thumbnail
-    url = f"{BASE_URL}/{i}/1/0xFFFFFF/0x333333/60_60-0.png"
-    download_file(url, f"assets/motifs/{i}.png")
+        if not os.path.exists(path):
+            ok = download(url, path)
+            if ok:
+                found_new = True
+            else:
+                break  # stop early when discovery stops
+    return found_new
+
+# --- MAIN ---
+last_bg = last_local_id("assets/backgrounds")
+last_motif = last_local_id("assets/motifs")
+
+print(f"Last BG: {last_bg} | Last Motif: {last_motif}")
+
+updated = False
+updated |= sync("assets/backgrounds", last_bg + 1, SCAN_AHEAD_BG, bg=True)
+updated |= sync("assets/motifs", last_motif + 1, SCAN_AHEAD_MOTIF)
+
+if not updated:
+    print("No new assets discovered.")
+else:
+    print("New assets added.")
