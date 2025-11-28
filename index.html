@@ -556,7 +556,8 @@
 
         function refreshPreview() {
             dom.preview.referrerPolicy = "no-referrer";
-            const url = `https://static.ankama.com/dofus/renderer/emblem/${appState.motifId}/${appState.bgId}/${appState.motifHex}/${appState.bgHex}/512_512-0.png`;
+            // Increased to 2000x2000 for high resolution output
+            const url = `https://static.ankama.com/dofus/renderer/emblem/${appState.motifId}/${appState.bgId}/${appState.motifHex}/${appState.bgHex}/2000_2000-0.png`;
             dom.preview.src = `${url}?v=${Date.now()}`;
             dom.urlBox.value = url;
         }
