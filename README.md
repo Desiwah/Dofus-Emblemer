@@ -6,6 +6,8 @@ NO more inactivity logout for picking too long! 😆
 
 Try it out <a href="https://desiwah.github.io/Dofus-Emblemer/" target="_blank">HERE</a>! 👈🏻
 
+&nbsp;
+
 # **Support**
 
 **Dofus-Emblemer** is free and always will be. If it’s made your life easier and you’d like to help keep it running and support my work, you can do so here:
