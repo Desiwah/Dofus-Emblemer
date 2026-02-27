@@ -12,6 +12,6 @@ Try it out <a href="https://desiwah.github.io/Dofus-Emblemer/" target="_blank">H
 
 **Dofus-Emblemer** is free and always will be. If it’s made your life easier and you’d like to help keep it running and support my work, you can do so here:
 
-[![Keep the Server Juiced](https://img.shields.io/badge/Keep_the_Server_Juiced-%23539764?style=for-the-badge&logo=amp&logoColor=white)](https://www.buymeacoffee.com/desiwah)
+[![Buy Me A Coffee](https://img.shields.io/badge/Support_the_Project-%23539764?style=for-the-badge&logo=buymeacoffee&logoColor=white)](https://donation.8520456.xyz)
 
 Thank you! ❤️
